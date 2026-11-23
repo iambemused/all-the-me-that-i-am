@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>All The Me That I Am</title>
+  <title>All The Me That I Am — v 1.3-a</title>
   <meta name="description" content="A cartography of self. Map the terrain of your life.">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1714">
@@ -50,8 +50,13 @@
     const AppCtx = React.createContext({ S:{}, lightMode:false });
 
     // ─── VERSION ───
-    const VERSION      = "1.1";
-    const VERSION_DATE = "March 2026";
+    // File identity: 20261123 all-the-me-that-i-am v 01.03-a
+    const VERSION      = "1.3";
+    const VERSION_DATE = "November 2026";
+    const FILE_ID      = "20261123 all-the-me-that-i-am v 01.03-a";
+    // Short visible-version tag — used in the browser tab title and the app header.
+    // Format: v M.m-x (M=major, m=minor, x=iteration letter).
+    const VERSION_TAG  = "v 1.3-a";
 
     const DARK = {
       bg:'#1a1714', bg2:'#2a2520', bg3:'#221f1a',
@@ -371,6 +376,8 @@
       const [showWorldLibrary, setShowWorldLibrary] = useState(false);
       const [showAboutModal, setShowAboutModal] = useState(false);
       const [showShareModal, setShowShareModal] = useState(false);
+      // v1.2: backup reminder — dismissed per session; staleness threshold = 30 days
+      const [backupBannerDismissed, setBackupBannerDismissed] = useState(false);
       const [showLinkedIn, setShowLinkedIn] = useState(false);
       const [cursorYear,    setCursorYear]      = useState(null);
       const [cursorX,       setCursorX]         = useState(null);
@@ -662,6 +669,9 @@
         a.download = `all-the-me-${data.name || "export"}-${new Date().toISOString().split("T")[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
+        // Record backup timestamp for staleness reminder (v1.2)
+        try { localStorage.setItem('attmtia-last-backup', new Date().toISOString()); } catch(e) {}
+        setBackupBannerDismissed(true);
       };
 
       // ─── EXPORT SHARED SELF (for Crossroads) ───
@@ -1426,7 +1436,24 @@
                 onMouseEnter={e=>e.target.style.opacity=1}
                 onMouseLeave={e=>e.target.style.opacity=0.85} />
               <div>
-                <h1 style={S.title}>All The Me That I Am</h1>
+                <div style={{display:"flex", alignItems:"baseline", gap:10, flexWrap:"wrap"}}>
+                  <h1 style={S.title}>All The Me That I Am</h1>
+                  {/* v1.3: visible version tag — clicking opens Versions tab in About */}
+                  <button
+                    onClick={() => setShowAboutModal(true)}
+                    title="Version — click to open About / Versions"
+                    style={{
+                      fontSize:11, fontWeight:600, letterSpacing:"0.06em",
+                      padding:"2px 8px", borderRadius:4,
+                      background: lightMode ? "rgba(61,107,138,0.10)" : "rgba(126,182,255,0.10)",
+                      color: lightMode ? "#3d6b8a" : "#7EB6FF",
+                      border: lightMode ? "1px solid rgba(61,107,138,0.25)" : "1px solid rgba(126,182,255,0.25)",
+                      fontFamily: "'DM Sans',system-ui,sans-serif",
+                      cursor: "pointer",
+                      lineHeight: 1.4,
+                    }}
+                  >{VERSION_TAG}</button>
+                </div>
                 <div style={S.subtitle}>
                   {data.name && <span>{data.name} · </span>}
                   {currentAge!==null && <span>Age {currentAge} · </span>}
@@ -1476,6 +1503,55 @@
               <button style={{...S.smallBtn,color:"#e8dcc8"}} onClick={() => setImportMsg(null)}>Dismiss</button>
             </div>
           )}
+
+          {/* v1.2: Backup reminder — user-configurable cadence (Settings → Reminders).
+              Appears if no backup recorded, or last backup is older than the user's
+              chosen threshold, and if there is meaningful data to lose. Dismissable
+              for the session; exporting resets the staleness clock. Threshold = 0
+              turns the reminder off entirely. */}
+          {(() => {
+            if (backupBannerDismissed) return null;
+            const threshold = typeof data.backupReminderDays === 'number'
+              ? data.backupReminderDays : 30;
+            if (threshold <= 0) return null;  // user has opted out
+            const meaningful = (data.events?.length || 0) >= 5
+                            || (data.strands?.length || 0) >= 2;
+            if (!meaningful) return null;
+            let last = null;
+            try { last = localStorage.getItem('attmtia-last-backup'); } catch(e) {}
+            const now = new Date();
+            let stale = false;
+            let message = "";
+            if (!last) {
+              stale = true;
+              message = "You've entered a fair bit now — no backup recorded yet. Your data lives only in this browser.";
+            } else {
+              const lastDate = new Date(last);
+              const days = Math.floor((now - lastDate) / (1000*60*60*24));
+              if (days >= threshold) {
+                stale = true;
+                message = `It's been ${days} days since your last backup. Your data lives only in this browser.`;
+              }
+            }
+            if (!stale) return null;
+            return (
+              <div style={{background:"rgba(255,167,38,0.09)",borderBottom:"1px solid rgba(255,167,38,0.22)",
+                padding:"10px 24px",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+                <span style={{fontSize:14,color:"#FFA726"}}>⚠</span>
+                <span style={{fontSize:12,color:"#d4ab7a",flex:1,lineHeight:1.5}}>
+                  <strong style={{color:"#FFA726"}}>Backup reminder — </strong>
+                  {message} A backup is a single JSON file you keep somewhere safe.
+                </span>
+                <button style={{...S.smallBtn,color:"#FFA726",
+                  background:"rgba(255,167,38,0.12)",
+                  border:"1px solid rgba(255,167,38,0.35)",
+                  padding:"4px 12px"}}
+                  onClick={exportData}>Backup now</button>
+                <button style={{...S.smallBtn,color:"#8a7a60"}}
+                  onClick={() => setBackupBannerDismissed(true)}>Later</button>
+              </div>
+            );
+          })()}
 
           {/* Review nudge — future events with review dates approaching */}
           {(() => {
@@ -2676,6 +2752,10 @@
       const isFirstTime = !data.dob;  // no close button for first-time users
       const [name, setName] = useState(data.name || "");
       const [le, setLe] = useState(data.lifeExpectancy || 82);
+      // v1.2: user-configurable backup reminder cadence (days). 0 = never remind.
+      const [backupReminderDays, setBackupReminderDays] = useState(
+        typeof data.backupReminderDays === 'number' ? data.backupReminderDays : 30
+      );
 
       // Parse existing dob into parts for dropdowns
       const parseDob = (d) => {
@@ -2752,7 +2832,35 @@
               <input style={S.input} type="number" value={le} onChange={e => setLe(parseInt(e.target.value)||82)} min={40} max={120} />
               <div style={S.hint}>Australian average is ~83. A contextual horizon, not a prediction.</div>
             </div>
-            <button style={{...S.addBtn,width:"100%",marginTop:16}} onClick={() => onSave({...data,name,dob,lifeExpectancy:le})} disabled={!dobY||!dobM}>Begin mapping</button>
+
+            {/* ── Reminders section — v1.2. This section is a starting point for
+                a broader set of app-behaviour preferences in future versions. ── */}
+            <div style={{
+              marginTop:18, paddingTop:14,
+              borderTop:`1px solid ${lightMode?"rgba(0,0,0,0.08)":"rgba(180,168,145,0.15)"}`,
+            }}>
+              <div style={{
+                fontSize:11, fontWeight:600,
+                color:lightMode?"rgba(0,0,0,0.5)":"rgba(180,168,145,0.6)",
+                textTransform:"uppercase", letterSpacing:"0.12em",
+                fontFamily:"'DM Sans',system-ui,sans-serif",
+                marginBottom:12,
+              }}>
+                Reminders
+              </div>
+              <div style={S.setupField}>
+                <label style={S.label}>Backup reminder cadence (days)</label>
+                <input style={S.input} type="number"
+                  value={backupReminderDays}
+                  onChange={e => setBackupReminderDays(Math.max(0, parseInt(e.target.value)||0))}
+                  min={0} max={365} />
+                <div style={S.hint}>
+                  A reminder appears if you haven't backed up in this many days.
+                  Set to 0 to turn the reminder off entirely. The app default is 30.
+                </div>
+              </div>
+            </div>
+            <button style={{...S.addBtn,width:"100%",marginTop:16}} onClick={() => onSave({...data,name,dob,lifeExpectancy:le,backupReminderDays})} disabled={!dobY||!dobM}>Begin mapping</button>
           </div>
         </div>
       );
@@ -3922,7 +4030,7 @@
       const [appDownloaded, setAppDownloaded] = React.useState(false);
       const [selfDownloaded,setSelfDownloaded]= React.useState(false);
 
-      const MOMO_SITE = "https://the-clan.wixsite.com/momocreative";
+      const MOMO_SITE = "https://momocreative.com.au";
       const KOFI      = "https://ko-fi.com/momocreative";
 
       const sharedCount  = (data.events || []).filter(e => !e.isPrivate).length;
@@ -4265,7 +4373,7 @@ This is a tool worth knowing about. I hope it's useful to you.`
       const { S, lightMode } = React.useContext(AppCtx);
       const [tab, setTab] = React.useState("what");
 
-      const MOMO_SITE = "https://the-clan.wixsite.com/momocreative";
+      const MOMO_SITE = "https://momocreative.com.au";
       const KOFI      = "https://ko-fi.com/momocreative";
 
       const tabs = [
@@ -4667,11 +4775,54 @@ This is a tool worth knowing about. I hope it's useful to you.`
               {tab === "versions" && (
                 <div>
                   <Panel color="blue" title={`Current — Version ${VERSION} (${VERSION_DATE})`}>
-                    <Bullet label="Pass it on">New ✉ button in header — invite someone to try the app, with optional Shared Self attachment and pre-written email.</Bullet>
-                    <Bullet label="About modal">Fully rewritten — tabbed interface, coloured panels, light/dark adaptive, proper clickable links, version history.</Bullet>
-                    <Bullet label="VERSION constant">Added at top of file for consistent version tracking.</Bullet>
-                    <Bullet label="Ko-fi link fixed">Now a proper clickable link throughout the app.</Bullet>
+                    <Bullet label="Visible version tag">A small version badge sits next to the app title in the main header, and the browser tab now also includes the version. Click the badge to jump here. End of mistaking one open file for another.</Bullet>
+                    <Bullet label="Version convention">Minor bump (1.2 → 1.3) for a new logical change; letter suffix (-a, -b, -c) for iterations within that change. Bumps happen regardless of whether a build has been deployed — the version reflects the file, not the live site.</Bullet>
                   </Panel>
+
+                  <details style={{ marginBottom:14 }}>
+                    <summary style={{ cursor:"pointer", fontSize:14, fontWeight:600,
+                      color:lightMode?"#3d6b8a":"#7EB6FF",
+                      fontFamily:"'DM Sans',system-ui,sans-serif",
+                      padding:"8px 0", borderBottom:`1px solid ${borderCol}`,
+                      listStyle:"none", display:"flex", justifyContent:"space-between" }}>
+                      <span>Version 1.2 — November 2026</span>
+                      <span style={{opacity:0.5,fontSize:12}}>click to expand</span>
+                    </summary>
+                    <div style={{paddingTop:12}}>
+                      <Panel color="teal">
+                        <Bullet label="Backup reminder">Non-blocking banner surfaces when no backup has ever been made or the last one was older than your chosen threshold. Cadence is user-configurable in Settings → Reminders (default 30 days, set to 0 to turn off). One-click backup from the banner; staleness clock resets on export.</Bullet>
+                        <Bullet label="Settings: Reminders section">New section in Settings as the home for app-behaviour preferences. Starts with backup cadence; designed to grow.</Bullet>
+                        <Bullet label="Website link corrected">In-app references to the MoMo Creative website now point to <strong>momocreative.com.au</strong> (previously the retired Wix address).</Bullet>
+                        <Bullet label="Versions tab refreshed">The tab now reflects actual state rather than aspirational state — including an explicit note on the gap between March and November 2026.</Bullet>
+                        <Bullet label="File identity string">Each file now carries its own version string internally, so a lost filename doesn't lose the version.</Bullet>
+                      </Panel>
+                    </div>
+                  </details>
+
+                  <Panel color="neutral">
+                    <Note>
+                      Between April and November 2026, no feature work was done on this app. Effort during that period went to consolidating the delivery infrastructure for the wider MoMo Creative suite — all apps now deploy via GitHub to Netlify on a consistent pattern. This app has carried on working during that time; it simply hasn't gained new capability. The <strong>Planned — next</strong> section below has been rewritten to reflect reality rather than the ambitions recorded in March.
+                    </Note>
+                  </Panel>
+
+                  <details style={{ marginBottom:14 }}>
+                    <summary style={{ cursor:"pointer", fontSize:14, fontWeight:600,
+                      color:lightMode?"#3d6b8a":"#7EB6FF",
+                      fontFamily:"'DM Sans',system-ui,sans-serif",
+                      padding:"8px 0", borderBottom:`1px solid ${borderCol}`,
+                      listStyle:"none", display:"flex", justifyContent:"space-between" }}>
+                      <span>Version 1.1 — March 2026</span>
+                      <span style={{opacity:0.5,fontSize:12}}>click to expand</span>
+                    </summary>
+                    <div style={{paddingTop:12}}>
+                      <Panel color="teal">
+                        <Bullet label="Pass it on">New ✉ button in header — invite someone to try the app, with optional Shared Self attachment and pre-written email.</Bullet>
+                        <Bullet label="About modal">Fully rewritten — tabbed interface, coloured panels, light/dark adaptive, proper clickable links, version history.</Bullet>
+                        <Bullet label="VERSION constant">Added at top of file for consistent version tracking.</Bullet>
+                        <Bullet label="Ko-fi link fixed">Now a proper clickable link throughout the app.</Bullet>
+                      </Panel>
+                    </div>
+                  </details>
 
                   <details style={{ marginBottom:14 }}>
                     <summary style={{ cursor:"pointer", fontSize:14, fontWeight:600,
@@ -4702,17 +4853,25 @@ This is a tool worth knowing about. I hope it's useful to you.`
                   </details>
 
                   <Section title="Planned — next">
-                    <Panel color="amber">
-                      <Bullet label="Relational World view">A new view showing the tree of relationships alongside the timeline — who was present during what years, visualised as arcs and branches rather than a track.</Bullet>
-                      <Bullet label="Decade summary">A decade-by-decade reckoning — what dominated each decade, what began and ended, what persisted.</Bullet>
-                      <Bullet label="The Crossroads integration">Improved Shared Self export with preview of what will be shared before export.</Bullet>
+                    <Panel color="amber" title="Design & navigation">
+                      <Bullet label="Layout mode chooser">Offer users a choice of layouts — a "First look" mode with one card at a time and large type, suited to mobile and new users; and a "Deep work" mode (the current dense layout) for sustained reflection. Think of it as a sibling to the existing light/dark toggle.</Bullet>
+                      <Bullet label="Mobile-first entry path">A guided set-up flow for first-time users on a phone — a few questions and prompts that produce a usable starter map in under five minutes, rather than presenting the full interface cold.</Bullet>
+                    </Panel>
+                    <Panel color="amber" title="The Strand model">
+                      <Bullet label="Relational strands as first-class objects">The February 2026 Relational World vision — relationships as continuous threads with phases, not as events. The underlying data model is already partly present; the view and the phase-suggestion engine are not.</Bullet>
+                      <Bullet label="Intention strands">Goals, ambitions, fears and concerns treated the same way as relational strands — threads that run across time, with phases (dormant / active / achieved / abandoned / transformed), surfaced on the timeline and askable in retrospect. "What was I aiming for in 2015? What became of it?"</Bullet>
+                    </Panel>
+                    <Panel color="amber" title="Carried forward from v1.1">
+                      <Bullet label="Decade summary view">A decade-by-decade reckoning — what dominated each decade, what began and ended, what persisted.</Bullet>
+                      <Bullet label="Shared Self preview">Improved export with a preview of what will be shared before the file is written, so there are no surprises.</Bullet>
                     </Panel>
                   </Section>
 
                   <div style={{ fontSize:12, color:textDimmer, marginTop:8,
                     fontFamily:"'DM Sans',system-ui,sans-serif", lineHeight:1.6 }}>
                     Created by MoMo Creative · Perth, Western Australia<br/>
-                    Built collaboratively by Michael and Claude (Anthropic)
+                    Built collaboratively by Michael and Claude (Anthropic)<br/>
+                    <span style={{opacity:0.7}}>File: {FILE_ID}</span>
                   </div>
                 </div>
               )}

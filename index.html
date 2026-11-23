@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>All The Me That I Am — v 1.3-a</title>
+  <title>All The Me That I Am — v 1.4-a</title>
   <meta name="description" content="A cartography of self. Map the terrain of your life.">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1714">
@@ -50,13 +50,13 @@
     const AppCtx = React.createContext({ S:{}, lightMode:false });
 
     // ─── VERSION ───
-    // File identity: 20261123 all-the-me-that-i-am v 01.03-a
-    const VERSION      = "1.3";
+    // File identity: 20261123 all-the-me-that-i-am v 01.04-a
+    const VERSION      = "1.4";
     const VERSION_DATE = "November 2026";
-    const FILE_ID      = "20261123 all-the-me-that-i-am v 01.03-a";
+    const FILE_ID      = "20261123 all-the-me-that-i-am v 01.04-a";
     // Short visible-version tag — used in the browser tab title and the app header.
     // Format: v M.m-x (M=major, m=minor, x=iteration letter).
-    const VERSION_TAG  = "v 1.3-a";
+    const VERSION_TAG  = "v 1.4-a";
 
     const DARK = {
       bg:'#1a1714', bg2:'#2a2520', bg3:'#221f1a',
@@ -208,6 +208,15 @@
 
     const STORAGE_KEY = "all-the-me-timeline-v2";
     const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+
+    // v1.4: local timestamp for export filenames — YYYY-MM-DD_HHMMSS in the user's
+    // local time zone. No colons (Windows-safe). Multiple backups in the same day
+    // sort chronologically and are distinguishable by their time.
+    const localStamp = () => {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    };
 
     const storage = {
       get(key) {
@@ -666,7 +675,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `all-the-me-${data.name || "export"}-${new Date().toISOString().split("T")[0]}.json`;
+        a.download = `all-the-me-${data.name || "export"}-${localStamp()}.json`;
         a.click();
         URL.revokeObjectURL(url);
         // Record backup timestamp for staleness reminder (v1.2)
@@ -721,12 +730,11 @@
           })),
         };
         const name = (data.name || "me").replace(/\s+/g,"-").toLowerCase();
-        const date = new Date().toISOString().split("T")[0];
         const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `crossroads-${name}-${date}.json`;
+        a.download = `crossroads-${name}-${localStamp()}.json`;
         a.click();
         URL.revokeObjectURL(url);
       };
@@ -4057,7 +4065,7 @@
       const buildEmailBody = () => {
         const note = personalNote.trim();
         const sharedLine = includeShared && sharedCount > 0
-          ? `\nI've also attached a small file — ${sharedCount} event${sharedCount!==1?"s":""} from my own life that I'm happy for you to see. It's called a Shared Self. You can import it into a companion app called The Crossroads if we ever get that far — but honestly, it's worth starting with the private work first.\n`
+          ? `\nI've also attached a small file — ${sharedCount} event${sharedCount!==1?"s":""} from my own life that I'm happy for you to see. It's called a Shared Self. You can import it into a companion app called The Crossroads if we ever get that far — but it's worth starting with the private work first.\n`
           : "";
 
         return encodeURIComponent(
@@ -4547,7 +4555,7 @@ This is a tool worth knowing about. I hope it's useful to you.`
                     </P>
                     <P>
                       Use it freely. Adapt it thoughtfully. Know that it carries embedded assumptions
-                      about how a human life looks when it is honestly examined.
+                      about how a human life looks when it is examined without pretence.
                     </P>
                   </Section>
 
@@ -4575,7 +4583,7 @@ This is a tool worth knowing about. I hope it's useful to you.`
                   <Panel color="blue" style={{marginBottom:22}}>
                     <P>
                       These tools carry embedded assumptions about what a life looks like when it is
-                      honestly examined. The philosophy below is not decoration — it is the architecture.
+                      examined squarely. The philosophy below is not decoration — it is the architecture.
                     </P>
                   </Panel>
 
@@ -4591,7 +4599,7 @@ This is a tool worth knowing about. I hope it's useful to you.`
                   <Section title="Privacy is structural, not promised">
                     <Panel color="teal">
                       <P>
-                        The private/shared distinction exists so you can map your whole life honestly —
+                        The private/shared distinction exists so you can map your whole life in full —
                         including parts you would never share — and then decide what crosses the threshold.
                         Marking an event private is not hiding it. It is exercising sovereignty over it.
                       </P>
@@ -4775,9 +4783,26 @@ This is a tool worth knowing about. I hope it's useful to you.`
               {tab === "versions" && (
                 <div>
                   <Panel color="blue" title={`Current — Version ${VERSION} (${VERSION_DATE})`}>
-                    <Bullet label="Visible version tag">A small version badge sits next to the app title in the main header, and the browser tab now also includes the version. Click the badge to jump here. End of mistaking one open file for another.</Bullet>
-                    <Bullet label="Version convention">Minor bump (1.2 → 1.3) for a new logical change; letter suffix (-a, -b, -c) for iterations within that change. Bumps happen regardless of whether a build has been deployed — the version reflects the file, not the live site.</Bullet>
+                    <Bullet label="Timestamped backup filenames">Backup and Shared Self exports now include a time as well as a date — e.g. <code>all-the-me-Michael-2026-11-23_114923.json</code>. Multiple backups in the same day sort chronologically and no longer collide into browser "(1)", "(2)" suffixes. Local time, no colons (Windows-safe).</Bullet>
+                    <Bullet label="Copy pass">Several instances of the word "honestly" removed from Philosophy, Privacy and the Pass-it-on email template. Reworded to carry the same meaning without the throat-clearing effect.</Bullet>
                   </Panel>
+
+                  <details style={{ marginBottom:14 }}>
+                    <summary style={{ cursor:"pointer", fontSize:14, fontWeight:600,
+                      color:lightMode?"#3d6b8a":"#7EB6FF",
+                      fontFamily:"'DM Sans',system-ui,sans-serif",
+                      padding:"8px 0", borderBottom:`1px solid ${borderCol}`,
+                      listStyle:"none", display:"flex", justifyContent:"space-between" }}>
+                      <span>Version 1.3 — November 2026</span>
+                      <span style={{opacity:0.5,fontSize:12}}>click to expand</span>
+                    </summary>
+                    <div style={{paddingTop:12}}>
+                      <Panel color="teal">
+                        <Bullet label="Visible version tag">A small version badge sits next to the app title in the main header, and the browser tab now also includes the version. Click the badge to jump here. End of mistaking one open file for another.</Bullet>
+                        <Bullet label="Version convention">Minor bump (1.2 → 1.3) for a new logical change; letter suffix (-a, -b, -c) for iterations within that change. Bumps happen regardless of whether a build has been deployed — the version reflects the file, not the live site.</Bullet>
+                      </Panel>
+                    </div>
+                  </details>
 
                   <details style={{ marginBottom:14 }}>
                     <summary style={{ cursor:"pointer", fontSize:14, fontWeight:600,
@@ -4903,7 +4928,7 @@ This is a tool worth knowing about. I hope it's useful to you.`
                     <P>
                       It was built collaboratively over many sessions, shaped by real personal context,
                       real family arrangements, and a genuine philosophical framework about what a human
-                      life looks like when it is honestly examined.
+                      life looks like when it is examined without pretence.
                     </P>
                     <P>
                       It is shared freely, for personal use. No advertising, no tracking, no subscription.
